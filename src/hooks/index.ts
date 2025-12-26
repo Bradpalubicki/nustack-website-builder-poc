@@ -16,3 +16,7 @@ export type { UseSEOAuditOptions, SEOAuditStats, UseSEOAuditReturn } from './use
 
 export { useLocalSEO } from './useLocalSEO';
 export type { UseLocalSEOOptions, LocalSEOCoverage, UseLocalSEOReturn, NAPConsistencyReport } from './useLocalSEO';
+
+// Performance hooks
+export { usePerformance, useMetric, usePerformanceScore } from './usePerformance';
+export type { UsePerformanceOptions, UsePerformanceReturn } from './usePerformance';
