@@ -5,6 +5,8 @@
  * - Resource hints for performance
  * - Schema.org structured data
  * - E-E-A-T compliance components
+ * - SEO Audit components
+ * - Quick Actions
  */
 
 // Resource hints
@@ -17,3 +19,9 @@ export * from './schema';
 
 // E-E-A-T components
 export * from './eeat';
+
+// Audit components
+export * from './audit';
+
+// Quick Actions
+export * from './quick-actions';

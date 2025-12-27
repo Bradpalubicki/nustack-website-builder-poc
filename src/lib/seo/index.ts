@@ -100,3 +100,6 @@ export type {
 
 // E-E-A-T requirements
 export * from './eeat';
+
+// SEO Audit Engine
+export * from './audit';
