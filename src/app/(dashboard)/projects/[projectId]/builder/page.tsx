@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import { useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -9,6 +9,8 @@ import { Separator } from "@/components/ui/separator"
 import { AIChat } from "@/components/builder/AIChat"
 import { PreviewPanel } from "@/components/builder/PreviewPanel"
 import { BuildProgress } from "@/components/builder/BuildProgress"
+import { createClient } from "@/lib/supabase/client"
+import { detectIndustry } from "@/lib/ai/knowledge-base"
 import {
   ArrowLeft,
   Eye,
@@ -68,9 +70,29 @@ const DEFAULT_CODE = `<!DOCTYPE html>
 </body>
 </html>`
 
+interface Project {
+  id: string
+  name: string
+  settings?: {
+    businessName?: string
+    industry?: string
+    importAnalysis?: any
+    analysisData?: any
+    discoveryAnswers?: Record<string, string>
+    selectedFeatures?: string[]
+    importedFromUrl?: string
+  }
+}
+
 export default function BuilderPage() {
   const params = useParams()
   const projectId = params.projectId as string
+  const supabase = createClient()
+
+  // Project data state
+  const [project, setProject] = useState<Project | null>(null)
+  const [projectLoading, setProjectLoading] = useState(true)
+
   const [activeTab, setActiveTab] = useState<"preview" | "code">("preview")
   const [viewportSize, setViewportSize] = useState<ViewportSize>("desktop")
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("split")
@@ -86,6 +108,65 @@ export default function BuilderPage() {
     currentStep: ''
   })
   const previewRef = useRef<{ refresh: () => void } | null>(null)
+
+  // Fetch project data on mount
+  useEffect(() => {
+    async function fetchProject() {
+      try {
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('id', projectId)
+          .single()
+
+        if (data && !error) {
+          setProject(data)
+        }
+      } catch (err) {
+        console.error('Failed to fetch project:', err)
+      } finally {
+        setProjectLoading(false)
+      }
+    }
+
+    fetchProject()
+  }, [projectId, supabase])
+
+  // Build projectContext from fetched data
+  const projectContext = useMemo(() => {
+    if (!project) return undefined
+
+    const settings = project.settings || {}
+    const analysis = settings.importAnalysis || settings.analysisData || {}
+
+    // Detect industry from analysis if not set
+    const industry = settings.industry || detectIndustry(analysis)
+
+    return {
+      projectName: project.name,
+      businessName: settings.businessName || analysis.businessName,
+      industry,
+      location: analysis.contactInfo?.address,
+      phone: analysis.contactInfo?.phone,
+      email: analysis.contactInfo?.email,
+      services: analysis.contentSections?.filter((s: any) => s.type === 'features')?.flatMap((s: any) => s.items || []),
+      features: settings.selectedFeatures,
+      existingWebsiteUrl: settings.importedFromUrl,
+      analysisData: analysis ? {
+        title: analysis.title,
+        description: analysis.description,
+        issues: analysis.issues,
+        strengths: analysis.strengths,
+        hasBooking: analysis.contentSections?.some((s: any) =>
+          s.type?.toLowerCase().includes('book') || s.type?.toLowerCase().includes('appointment')
+        ),
+        hasForms: analysis.contentSections?.some((s: any) =>
+          s.type?.toLowerCase().includes('form') || s.type?.toLowerCase().includes('contact')
+        ),
+        socialLinks: analysis.socialLinks?.map((s: any) => s.platform),
+      } : undefined,
+    }
+  }, [project])
 
   const handleBuildStateChange = useCallback((state: BuildState) => {
     setBuildState(state)
@@ -179,6 +260,21 @@ ${code}
     } else {
       setLayoutMode("split")
     }
+  }
+
+  // Show loading state while fetching project
+  if (projectLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-50 dark:bg-dark-900">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Sparkles className="h-8 w-8 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Loading Project</h2>
+          <p className="text-muted-foreground">Preparing your builder...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -425,6 +521,7 @@ ${code}
             )}
             <AIChat
               projectId={projectId}
+              projectContext={projectContext}
               onCodeGenerated={handleCodeGenerated}
               onPreviewReady={handlePreviewReady}
               onBuildStateChange={handleBuildStateChange}

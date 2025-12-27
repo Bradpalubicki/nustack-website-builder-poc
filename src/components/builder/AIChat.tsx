@@ -305,6 +305,7 @@ IMPORTANT: You have all the data you need from the analysis above. Generate code
             content: m.content,
           })),
           siteAnalysis: analysisData,
+          projectContext,
         }),
       });
 

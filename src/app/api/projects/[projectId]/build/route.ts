@@ -44,7 +44,7 @@ export async function POST(
 
     // Parse request body
     const body = await request.json();
-    const { message, history = [], siteAnalysis } = body;
+    const { message, history = [], siteAnalysis, projectContext: clientContext } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -56,36 +56,55 @@ export async function POST(
     // Build comprehensive project context
     const settings = project.settings || {};
 
-    // Auto-detect industry if not set
-    const detectedIndustry = settings.industry || detectIndustry({
-      businessName: settings.businessName,
-      description: siteAnalysis?.description,
-      title: siteAnalysis?.title,
-      services: settings.services,
-    });
+    // Get stored analysis data (from import wizard) - check both possible field names
+    const storedAnalysis = settings.importAnalysis || settings.analysisData || {};
 
-    // Build project context for smart prompts
+    // Merge stored analysis with any new analysis from request
+    const mergedAnalysis = {
+      ...storedAnalysis,
+      ...(siteAnalysis || {}),
+    };
+
+    // Auto-detect industry from all available sources
+    const detectedIndustry = settings.industry ||
+      clientContext?.industry ||
+      detectIndustry({
+        businessName: settings.businessName || mergedAnalysis.businessName,
+        description: mergedAnalysis.description,
+        title: mergedAnalysis.title,
+        services: settings.services || mergedAnalysis.services,
+      });
+
+    // Build project context for smart prompts, merging all sources
     const projectContext: ProjectContext = {
       projectName: project.name,
-      businessName: settings.businessName,
+      businessName: settings.businessName || mergedAnalysis.businessName || clientContext?.businessName,
       industry: detectedIndustry,
-      location: settings.location,
-      phone: settings.phone,
-      email: settings.email,
-      services: settings.services,
-      features: settings.features,
-      existingWebsiteUrl: settings.existingUrl || siteAnalysis?.url,
-      analysisData: siteAnalysis ? {
-        title: siteAnalysis.title,
-        description: siteAnalysis.description,
-        hasBooking: siteAnalysis.contentSections?.some((s: { type: string }) =>
-          s.type.toLowerCase().includes('book') || s.type.toLowerCase().includes('appointment')
+      location: settings.location || mergedAnalysis.contactInfo?.address || clientContext?.location,
+      phone: settings.phone || mergedAnalysis.contactInfo?.phone || clientContext?.phone,
+      email: settings.email || mergedAnalysis.contactInfo?.email || clientContext?.email,
+      services: settings.services || mergedAnalysis.services || clientContext?.services,
+      features: settings.selectedFeatures || settings.features || clientContext?.features,
+      existingWebsiteUrl: settings.importedFromUrl || settings.existingUrl || mergedAnalysis.url || clientContext?.existingWebsiteUrl,
+      analysisData: {
+        title: mergedAnalysis.title,
+        description: mergedAnalysis.description,
+        issues: mergedAnalysis.issues,
+        strengths: mergedAnalysis.strengths,
+        hasBooking: mergedAnalysis.contentSections?.some((s: { type: string }) =>
+          s.type?.toLowerCase().includes('book') || s.type?.toLowerCase().includes('appointment')
         ),
-        hasForms: siteAnalysis.contentSections?.some((s: { type: string }) =>
-          s.type.toLowerCase().includes('form') || s.type.toLowerCase().includes('contact')
+        hasForms: mergedAnalysis.contentSections?.some((s: { type: string }) =>
+          s.type?.toLowerCase().includes('form') || s.type?.toLowerCase().includes('contact')
         ),
-        socialLinks: siteAnalysis.socialLinks?.map((s: { platform: string }) => s.platform),
-      } : undefined,
+        hasReviews: mergedAnalysis.contentSections?.some((s: { type: string }) =>
+          s.type?.toLowerCase().includes('testimonial') || s.type?.toLowerCase().includes('review')
+        ),
+        socialLinks: mergedAnalysis.socialLinks?.map((s: { platform: string }) => s.platform),
+        currentDesignScore: mergedAnalysis.designScore,
+        seoScore: mergedAnalysis.seoScore,
+        mobileScore: mergedAnalysis.mobileScore,
+      },
       customInstructions: settings.customInstructions,
     };
 
