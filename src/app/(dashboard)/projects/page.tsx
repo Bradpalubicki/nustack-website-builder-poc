@@ -1,88 +1,117 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import Link from "next/link"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Plus, Search, Globe, Calendar, MoreVertical } from "lucide-react"
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from '@/components/ui/dropdown-menu';
+import {
+  Plus,
+  Search,
+  Globe,
+  Calendar,
+  MoreVertical,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 
-const projects = [
-  {
-    id: "1",
-    name: "E-commerce Store",
-    description: "Online store with product catalog and checkout",
-    status: "deployed",
-    url: "https://store.example.com",
-    createdAt: "2024-01-15",
-    framework: "Next.js",
-  },
-  {
-    id: "2",
-    name: "Portfolio Site",
-    description: "Personal portfolio showcasing projects",
-    status: "building",
-    url: null,
-    createdAt: "2024-01-20",
-    framework: "Next.js",
-  },
-  {
-    id: "3",
-    name: "Blog Platform",
-    description: "Content-driven blog with markdown support",
-    status: "deployed",
-    url: "https://blog.example.com",
-    createdAt: "2024-01-10",
-    framework: "Next.js",
-  },
-  {
-    id: "4",
-    name: "Landing Page",
-    description: "Marketing landing page for product launch",
-    status: "draft",
-    url: null,
-    createdAt: "2024-01-25",
-    framework: "Next.js",
-  },
-]
+interface Project {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: 'draft' | 'building' | 'deployed';
+  template_id: string;
+  settings: {
+    domain?: string;
+    industry?: string;
+    businessName?: string;
+    primaryColor?: string;
+  };
+  created_at: string;
+  updated_at: string;
+}
 
 export default function ProjectsPage() {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [newProjectName, setNewProjectName] = useState("")
-  const [newProjectDescription, setNewProjectDescription] = useState("")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchProjects = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/projects');
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects');
+      }
+      const data = await response.json();
+      setProjects(data.projects || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProjects();
+  }, []);
 
   const filteredProjects = projects.filter(
     (project) =>
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      project.description.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+      (project.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-  const handleCreateProject = () => {
-    // TODO: Implement project creation
-    console.log("Creating project:", { name: newProjectName, description: newProjectDescription })
-    setIsDialogOpen(false)
-    setNewProjectName("")
-    setNewProjectDescription("")
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+      });
+      if (response.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      }
+    } catch (err) {
+      console.error('Failed to delete project:', err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-primary" />
+          <p className="mt-4 text-muted-foreground">Loading projects...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -93,49 +122,32 @@ export default function ProjectsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
           <p className="text-muted-foreground">Manage your website projects</p>
         </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
+        <div className="flex gap-2">
+          <Button variant="outline" size="icon" onClick={fetchProjects}>
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Link href="/projects/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               New Project
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
-                Start building a new website with AI assistance
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="projectName">Project Name</Label>
-                <Input
-                  id="projectName"
-                  placeholder="My Awesome Website"
-                  value={newProjectName}
-                  onChange={(e) => setNewProjectName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="projectDescription">Description</Label>
-                <Textarea
-                  id="projectDescription"
-                  placeholder="Describe what you want to build..."
-                  value={newProjectDescription}
-                  onChange={(e) => setNewProjectDescription(e.target.value)}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateProject}>Create Project</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </Link>
+        </div>
       </div>
+
+      {/* Error State */}
+      {error && (
+        <div className="p-4 bg-red-50 dark:bg-red-950/50 text-red-600 rounded-md">
+          {error}
+          <Button
+            variant="link"
+            className="ml-2 text-red-600"
+            onClick={fetchProjects}
+          >
+            Try again
+          </Button>
+        </div>
+      )}
 
       {/* Search and Filter */}
       <div className="flex items-center gap-4">
@@ -150,145 +162,134 @@ export default function ProjectsPage() {
         </div>
       </div>
 
+      {/* Empty State */}
+      {projects.length === 0 && !error && (
+        <Card className="p-12 text-center">
+          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+            <Plus className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
+          <p className="text-muted-foreground mb-4">
+            Create your first project to get started building with AI.
+          </p>
+          <Link href="/projects/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Create Your First Project
+            </Button>
+          </Link>
+        </Card>
+      )}
+
       {/* Tabs */}
-      <Tabs defaultValue="all" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="all">All Projects</TabsTrigger>
-          <TabsTrigger value="deployed">Deployed</TabsTrigger>
-          <TabsTrigger value="building">Building</TabsTrigger>
-          <TabsTrigger value="draft">Drafts</TabsTrigger>
-        </TabsList>
+      {projects.length > 0 && (
+        <Tabs defaultValue="all" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="all">All Projects ({projects.length})</TabsTrigger>
+            <TabsTrigger value="deployed">
+              Deployed ({projects.filter((p) => p.status === 'deployed').length})
+            </TabsTrigger>
+            <TabsTrigger value="building">
+              Building ({projects.filter((p) => p.status === 'building').length})
+            </TabsTrigger>
+            <TabsTrigger value="draft">
+              Drafts ({projects.filter((p) => p.status === 'draft').length})
+            </TabsTrigger>
+          </TabsList>
 
-        <TabsContent value="all" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects.map((project) => (
-              <Card key={project.id} className="hover:border-primary/50 transition-colors">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{project.name}</CardTitle>
-                      <CardDescription className="mt-1">{project.description}</CardDescription>
-                    </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>Edit</DropdownMenuItem>
-                        <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive">Delete</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Badge
-                      variant={
-                        project.status === "deployed"
-                          ? "default"
-                          : project.status === "building"
-                          ? "secondary"
-                          : "outline"
-                      }
+          {['all', 'deployed', 'building', 'draft'].map((tabValue) => (
+            <TabsContent key={tabValue} value={tabValue} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredProjects
+                  .filter((p) => tabValue === 'all' || p.status === tabValue)
+                  .map((project) => (
+                    <Card
+                      key={project.id}
+                      className="hover:border-primary/50 transition-colors"
                     >
-                      {project.status}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">{project.framework}</span>
-                  </div>
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <CardTitle className="text-lg">{project.name}</CardTitle>
+                            <CardDescription className="mt-1">
+                              {project.description || 'No description'}
+                            </CardDescription>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/projects/${project.id}/builder`}>
+                                  Open Builder
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/projects/${project.id}/settings`}>
+                                  Settings
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDeleteProject(project.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant={
+                              project.status === 'deployed'
+                                ? 'default'
+                                : project.status === 'building'
+                                  ? 'secondary'
+                                  : 'outline'
+                            }
+                          >
+                            {project.status}
+                          </Badge>
+                          {project.settings?.industry && (
+                            <span className="text-xs text-muted-foreground">
+                              {project.settings.industry}
+                            </span>
+                          )}
+                        </div>
 
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    {project.url && (
-                      <div className="flex items-center gap-1">
-                        <Globe className="h-3 w-3" />
-                        <span className="truncate max-w-[150px]">{project.url}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      <span>{project.createdAt}</span>
-                    </div>
-                  </div>
+                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                          {project.settings?.domain && (
+                            <div className="flex items-center gap-1">
+                              <Globe className="h-3 w-3" />
+                              <span className="truncate max-w-[150px]">
+                                {project.settings.domain}
+                              </span>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            <span>{formatDate(project.created_at)}</span>
+                          </div>
+                        </div>
 
-                  <Link href={`/projects/${project.id}/builder`}>
-                    <Button className="w-full" variant="outline">
-                      Open Builder
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="deployed">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects
-              .filter((p) => p.status === "deployed")
-              .map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link href={`/projects/${project.id}/builder`}>
-                      <Button className="w-full" variant="outline">
-                        Open Builder
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="building">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects
-              .filter((p) => p.status === "building")
-              .map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link href={`/projects/${project.id}/builder`}>
-                      <Button className="w-full" variant="outline">
-                        Open Builder
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="draft">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredProjects
-              .filter((p) => p.status === "draft")
-              .map((project) => (
-                <Card key={project.id}>
-                  <CardHeader>
-                    <CardTitle>{project.name}</CardTitle>
-                    <CardDescription>{project.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Link href={`/projects/${project.id}/builder`}>
-                      <Button className="w-full" variant="outline">
-                        Open Builder
-                      </Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              ))}
-          </div>
-        </TabsContent>
-      </Tabs>
+                        <Link href={`/projects/${project.id}/builder`}>
+                          <Button className="w-full" variant="outline">
+                            Open Builder
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+              </div>
+            </TabsContent>
+          ))}
+        </Tabs>
+      )}
     </div>
-  )
+  );
 }
