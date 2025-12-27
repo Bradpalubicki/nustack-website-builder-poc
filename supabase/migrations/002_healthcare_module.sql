@@ -2,22 +2,11 @@
 -- This migration adds healthcare-specific functionality to the NuStack Builder
 
 -- ============================================================================
--- PREREQUISITE: Ensure projects table exists (from base NuStack Builder)
+-- PREREQUISITE: 001_base_schema.sql must be run first (creates projects table)
 -- ============================================================================
 
--- Create projects table if it doesn't exist (base table needed for healthcare module)
-CREATE TABLE IF NOT EXISTS projects (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    description TEXT,
-    template VARCHAR(100),
-    status VARCHAR(20) DEFAULT 'draft',
-    domain VARCHAR(255),
-    user_id UUID,
-    settings JSONB DEFAULT '{}',
-    created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-);
+-- The projects table is created in 001_base_schema.sql with columns:
+-- id, name, slug, description, template_id, status, user_id, settings, created_at, updated_at
 
 -- ============================================================================
 -- TABLE 1: medical_practices

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { AIChat } from "@/components/ai-chat"
+import { AIChat } from "@/components/builder/AIChat"
 import {
   ArrowLeft,
   Eye,
