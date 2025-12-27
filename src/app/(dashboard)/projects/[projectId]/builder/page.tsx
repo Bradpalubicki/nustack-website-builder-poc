@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { AIChat } from "@/components/builder/AIChat"
 import { PreviewPanel } from "@/components/builder/PreviewPanel"
+import { BuildProgress } from "@/components/builder/BuildProgress"
 import {
   ArrowLeft,
   Eye,
@@ -30,6 +31,12 @@ import Link from "next/link"
 
 type ViewportSize = "desktop" | "tablet" | "mobile"
 type LayoutMode = "split" | "preview-only" | "chat-only"
+
+interface BuildState {
+  isBuilding: boolean
+  progress: number
+  currentStep: string
+}
 
 const DEFAULT_CODE = `<!DOCTYPE html>
 <html lang="en">
@@ -73,7 +80,16 @@ export default function BuilderPage() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle")
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [buildState, setBuildState] = useState<BuildState>({
+    isBuilding: false,
+    progress: 0,
+    currentStep: ''
+  })
   const previewRef = useRef<{ refresh: () => void } | null>(null)
+
+  const handleBuildStateChange = useCallback((state: BuildState) => {
+    setBuildState(state)
+  }, [])
 
   const handleCodeGenerated = useCallback((code: string, language: string) => {
     // Wrap component code in full HTML if needed
@@ -392,6 +408,7 @@ ${code}
               projectId={projectId}
               onCodeGenerated={handleCodeGenerated}
               onPreviewReady={handlePreviewReady}
+              onBuildStateChange={handleBuildStateChange}
             />
           </>
         )}
@@ -406,6 +423,20 @@ ${code}
           <Sparkles className="h-4 w-4" />
           Open AI Chat
         </Button>
+      )}
+
+      {/* Full-Screen Build Progress Overlay */}
+      {buildState.isBuilding && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
+            <BuildProgress
+              isBuilding={buildState.isBuilding}
+              currentStep={buildState.currentStep}
+              progress={buildState.progress}
+              estimatedTime={30}
+            />
+          </div>
+        </div>
       )}
     </div>
   )

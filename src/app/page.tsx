@@ -93,7 +93,7 @@ export default async function Home() {
                 size="lg"
                 variant="outline"
                 asChild
-                className="border-2 border-white/50 text-white hover:bg-white hover:text-slate-900 px-8 py-6 text-lg font-semibold backdrop-blur-sm"
+                className="border-2 border-white text-white bg-transparent hover:bg-white hover:text-slate-900 px-8 py-6 text-lg font-semibold"
               >
                 <Link href="/login">Log In</Link>
               </Button>

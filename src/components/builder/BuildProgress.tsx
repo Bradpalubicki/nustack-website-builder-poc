@@ -31,6 +31,8 @@ interface BuildProgressProps {
   isBuilding: boolean;
   estimatedTime?: number; // in seconds
   onBuildComplete?: () => void;
+  currentStep?: string; // Override step label from parent
+  progress?: number; // Override progress from parent (0-100)
 }
 
 const BUILD_STEPS: BuildStep[] = [
@@ -98,25 +100,33 @@ export function BuildProgress({
   isBuilding,
   estimatedTime = 30,
   onBuildComplete,
+  currentStep: externalCurrentStep,
+  progress: externalProgress,
 }: BuildProgressProps) {
-  const [progress, setProgress] = useState(0);
+  const [internalProgress, setInternalProgress] = useState(0);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [tipIndex, setTipIndex] = useState(0);
   const [files, setFiles] = useState<FileStatus[]>([]);
   const [elapsedTime, setElapsedTime] = useState(0);
 
-  // Progress simulation
+  // Use external progress if provided, otherwise use internal
+  const progress = externalProgress !== undefined ? externalProgress : internalProgress;
+
+  // Progress simulation (only when no external progress)
   useEffect(() => {
     if (!isBuilding) {
-      setProgress(0);
+      setInternalProgress(0);
       setCurrentStepIndex(0);
       setFiles([]);
       setElapsedTime(0);
       return;
     }
 
+    // Skip internal progress if external is provided
+    if (externalProgress !== undefined) return;
+
     const progressInterval = setInterval(() => {
-      setProgress((prev) => {
+      setInternalProgress((prev) => {
         if (prev >= 100) {
           clearInterval(progressInterval);
           onBuildComplete?.();
@@ -129,7 +139,7 @@ export function BuildProgress({
     }, estimatedTime * 10); // Spread over estimated time
 
     return () => clearInterval(progressInterval);
-  }, [isBuilding, estimatedTime, onBuildComplete]);
+  }, [isBuilding, estimatedTime, onBuildComplete, externalProgress]);
 
   // Update current step based on progress
   useEffect(() => {
@@ -207,10 +217,12 @@ export function BuildProgress({
 
   if (!isBuilding) return null;
 
-  const currentStep = BUILD_STEPS[currentStepIndex];
+  const currentStepData = BUILD_STEPS[currentStepIndex];
+  // Use external step label if provided, otherwise use internal
+  const displayStepLabel = externalCurrentStep || currentStepData.description;
 
   return (
-    <div className="space-y-6 p-6 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20 animate-pulse-subtle">
+    <div className="space-y-6 p-6 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg border border-primary/20">
       {/* Header with estimated time */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -218,8 +230,8 @@ export function BuildProgress({
             <Rocket className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">Building Your Site</h3>
-            <p className="text-xs text-muted-foreground">
+            <h3 className="font-semibold text-lg">Building Your Site</h3>
+            <p className="text-sm text-muted-foreground">
               Please wait while we create your website
             </p>
           </div>
@@ -235,10 +247,10 @@ export function BuildProgress({
       {/* Progress bar */}
       <div className="space-y-2">
         <div className="flex justify-between text-sm">
-          <span className="text-muted-foreground">{currentStep.description}</span>
-          <span className="font-medium">{Math.round(progress)}%</span>
+          <span className="text-muted-foreground font-medium">{displayStepLabel}</span>
+          <span className="font-bold text-primary">{Math.round(progress)}%</span>
         </div>
-        <Progress value={progress} className="h-3" />
+        <Progress value={progress} className="h-4" />
       </div>
 
       {/* Step indicators */}
