@@ -36,19 +36,32 @@ interface BuildSummary {
   previewUrl?: string;
 }
 
+interface SiteAnalysis {
+  url: string;
+  title?: string;
+  description?: string;
+  colors?: Array<{ hex: string; name?: string }>;
+  fonts?: string[];
+  images?: Array<{ src: string; alt?: string; type?: string }>;
+  navigation?: Array<{ text: string; href: string }>;
+  socialLinks?: Array<{ platform: string; url: string }>;
+  contentSections?: Array<{ type: string; content: string }>;
+}
+
 interface AIChatProps {
   projectId: string;
   onCodeGenerated?: (code: string, language: string) => void;
   onPreviewReady?: (url: string) => void;
+  onBuildStateChange?: (state: { isBuilding: boolean; progress: number; currentStep: string }) => void;
 }
 
-export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatProps) {
+export function AIChat({ projectId, onCodeGenerated, onPreviewReady, onBuildStateChange }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hi! I'm your AI assistant. I can help you build your website. Try asking me to:\n\n- Create a hero section\n- Add a contact form\n- Generate a navigation menu\n- Optimize your content for SEO\n\nWhat would you like to build?",
+        "Hi! I'm your AI assistant. I can help you build your website. Try:\n\n- Paste a URL like \"doctorsofhair.com\" and I'll analyze it\n- Ask me to create a hero section\n- Request a contact form or navigation menu\n\nWhat would you like to build?",
       timestamp: new Date(),
     },
   ]);
@@ -58,8 +71,46 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
   const [buildComplete, setBuildComplete] = useState(false);
   const [buildSummary, setBuildSummary] = useState<BuildSummary | null>(null);
   const [estimatedTime, setEstimatedTime] = useState(30);
+  const [currentStep, setCurrentStep] = useState('');
+  const [buildProgress, setBuildProgress] = useState(0);
+  const [siteAnalysis, setSiteAnalysis] = useState<SiteAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // URL detection regex - matches both full URLs and domain names
+  const urlPattern = /(https?:\/\/[^\s]+)|([a-zA-Z0-9][-a-zA-Z0-9]*\.[a-zA-Z]{2,}(?:\/[^\s]*)?)/gi;
+
+  // Auto-analyze a URL
+  const analyzeUrl = async (url: string): Promise<SiteAnalysis | null> => {
+    try {
+      setIsAnalyzing(true);
+      setCurrentStep('Analyzing website...');
+      onBuildStateChange?.({ isBuilding: true, progress: 10, currentStep: 'Analyzing website...' });
+
+      // Ensure URL has protocol
+      const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+
+      const response = await fetch('/api/analyze-site', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: fullUrl }),
+      });
+
+      if (response.ok) {
+        const analysis = await response.json();
+        setSiteAnalysis(analysis);
+        setCurrentStep('Analysis complete!');
+        onBuildStateChange?.({ isBuilding: true, progress: 30, currentStep: 'Analysis complete!' });
+        return analysis;
+      }
+    } catch (error) {
+      console.error('URL analysis failed:', error);
+    } finally {
+      setIsAnalyzing(false);
+    }
+    return null;
+  };
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -174,6 +225,18 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
     setBuildComplete(false);
     setBuildSummary(null);
     setEstimatedTime(estimateBuildTime(input));
+    setBuildProgress(0);
+
+    // Detect URLs in the message
+    const urls = userMessage.content.match(urlPattern);
+    let analysisData: SiteAnalysis | null = null;
+
+    // Auto-analyze if URL detected
+    if (urls && urls.length > 0) {
+      setCurrentStep('Detecting website URL...');
+      onBuildStateChange?.({ isBuilding: true, progress: 5, currentStep: 'Detecting website URL...' });
+      analysisData = await analyzeUrl(urls[0]);
+    }
 
     // Add placeholder for assistant response
     const assistantId = `assistant-${Date.now()}`;
@@ -188,16 +251,39 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
       },
     ]);
 
+    setCurrentStep('Generating your website...');
+    onBuildStateChange?.({ isBuilding: true, progress: 40, currentStep: 'Generating your website...' });
+
     try {
+      // Build context with analysis data if available
+      let enhancedMessage = userMessage.content;
+      if (analysisData) {
+        enhancedMessage = `
+User wants to work with this website: ${analysisData.url}
+
+SITE ANALYSIS DATA (already analyzed - do NOT ask for more info):
+- Title: ${analysisData.title || 'N/A'}
+- Description: ${analysisData.description || 'N/A'}
+- Colors found: ${analysisData.colors?.map(c => c.hex).join(', ') || 'N/A'}
+- Fonts: ${analysisData.fonts?.join(', ') || 'N/A'}
+- Navigation items: ${analysisData.navigation?.map(n => n.text).join(', ') || 'N/A'}
+- Social links: ${analysisData.socialLinks?.map(s => s.platform).join(', ') || 'N/A'}
+
+User's request: ${userMessage.content}
+
+IMPORTANT: You have all the data you need from the analysis above. Generate code immediately based on this data. Do NOT ask for the current code, colors, or other information - use what's provided above.`;
+      }
+
       const response = await fetch(`/api/projects/${projectId}/build`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage.content,
+          message: enhancedMessage,
           history: messages.map((m) => ({
             role: m.role,
             content: m.content,
           })),
+          siteAnalysis: analysisData,
         }),
       });
 
@@ -210,13 +296,22 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
       const decoder = new TextDecoder();
       let fullContent = '';
 
+      setCurrentStep('Writing code...');
+      onBuildStateChange?.({ isBuilding: true, progress: 60, currentStep: 'Writing code...' });
+
       if (reader) {
+        let chunkCount = 0;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value);
           fullContent += chunk;
+          chunkCount++;
+
+          // Update progress as we receive chunks
+          const progress = Math.min(60 + (chunkCount * 2), 90);
+          onBuildStateChange?.({ isBuilding: true, progress, currentStep: 'Writing code...' });
 
           setMessages((prev) =>
             prev.map((m) =>
@@ -227,6 +322,9 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
           );
         }
       }
+
+      setCurrentStep('Finalizing...');
+      onBuildStateChange?.({ isBuilding: true, progress: 95, currentStep: 'Finalizing...' });
 
       // Mark streaming as complete
       setMessages((prev) =>
@@ -249,6 +347,8 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
       if (codeBlocks.length > 0) {
         handleBuildComplete();
       }
+
+      onBuildStateChange?.({ isBuilding: false, progress: 100, currentStep: 'Complete!' });
     } catch (error) {
       console.error('Chat error:', error);
       setMessages((prev) =>
@@ -262,6 +362,7 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatPro
             : m
         )
       );
+      onBuildStateChange?.({ isBuilding: false, progress: 0, currentStep: '' });
     } finally {
       setIsLoading(false);
       inputRef.current?.focus();
