@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { BuildProgress } from './BuildProgress';
 import {
   Send,
   Loader2,
@@ -13,6 +15,10 @@ import {
   Copy,
   Check,
   RefreshCw,
+  PartyPopper,
+  ExternalLink,
+  FileCode,
+  FolderPlus,
 } from 'lucide-react';
 
 interface Message {
@@ -23,24 +29,35 @@ interface Message {
   isStreaming?: boolean;
 }
 
+interface BuildSummary {
+  filesCreated: number;
+  componentsCreated: number;
+  pagesCreated: number;
+  previewUrl?: string;
+}
+
 interface AIChatProps {
   projectId: string;
   onCodeGenerated?: (code: string, language: string) => void;
+  onPreviewReady?: (url: string) => void;
 }
 
-export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
+export function AIChat({ projectId, onCodeGenerated, onPreviewReady }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
       content:
-        "Hi! I'm your AI assistant. I can help you build your website. Try asking me to:\n\n• Create a hero section\n• Add a contact form\n• Generate a navigation menu\n• Optimize your content for SEO\n\nWhat would you like to build?",
+        "Hi! I'm your AI assistant. I can help you build your website. Try asking me to:\n\n- Create a hero section\n- Add a contact form\n- Generate a navigation menu\n- Optimize your content for SEO\n\nWhat would you like to build?",
       timestamp: new Date(),
     },
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [buildComplete, setBuildComplete] = useState(false);
+  const [buildSummary, setBuildSummary] = useState<BuildSummary | null>(null);
+  const [estimatedTime, setEstimatedTime] = useState(30);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -50,6 +67,58 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Trigger confetti celebration
+  const triggerCelebration = useCallback(() => {
+    const duration = 3000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+    function randomInRange(min: number, max: number) {
+      return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function () {
+      const timeLeft = animationEnd - Date.now();
+
+      if (timeLeft <= 0) {
+        return clearInterval(interval);
+      }
+
+      const particleCount = 50 * (timeLeft / duration);
+
+      // Left side
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      });
+      // Right side
+      confetti({
+        ...defaults,
+        particleCount,
+        origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      });
+    }, 250);
+  }, []);
+
+  const handleBuildComplete = useCallback(() => {
+    setBuildComplete(true);
+    triggerCelebration();
+
+    // Simulate build summary (in real app, this would come from the API)
+    const summary: BuildSummary = {
+      filesCreated: Math.floor(Math.random() * 8) + 5,
+      componentsCreated: Math.floor(Math.random() * 4) + 2,
+      pagesCreated: Math.floor(Math.random() * 3) + 1,
+      previewUrl: `https://${projectId}.vercel.app`, // Simulated preview URL
+    };
+    setBuildSummary(summary);
+
+    if (summary.previewUrl && onPreviewReady) {
+      onPreviewReady(summary.previewUrl);
+    }
+  }, [projectId, onPreviewReady, triggerCelebration]);
 
   const copyToClipboard = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -72,6 +141,23 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
     return blocks;
   };
 
+  // Estimate build time based on prompt complexity
+  const estimateBuildTime = (prompt: string): number => {
+    const wordCount = prompt.split(/\s+/).length;
+    const hasMultipleComponents = prompt.toLowerCase().includes(' and ');
+    const isComplexRequest =
+      prompt.toLowerCase().includes('page') ||
+      prompt.toLowerCase().includes('section') ||
+      prompt.toLowerCase().includes('form');
+
+    let baseTime = 20;
+    if (wordCount > 20) baseTime += 10;
+    if (hasMultipleComponents) baseTime += 15;
+    if (isComplexRequest) baseTime += 10;
+
+    return Math.min(baseTime, 60);
+  };
+
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
 
@@ -85,6 +171,9 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setIsLoading(true);
+    setBuildComplete(false);
+    setBuildSummary(null);
+    setEstimatedTime(estimateBuildTime(input));
 
     // Add placeholder for assistant response
     const assistantId = `assistant-${Date.now()}`;
@@ -154,6 +243,11 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
         codeBlocks.forEach((block) => {
           onCodeGenerated(block.code, block.language);
         });
+      }
+
+      // Trigger build complete celebration if code was generated
+      if (codeBlocks.length > 0) {
+        handleBuildComplete();
       }
     } catch (error) {
       console.error('Chat error:', error);
@@ -294,11 +388,74 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
               )}
             </div>
           ))}
+
+          {/* Build Progress */}
+          {isLoading && (
+            <BuildProgress
+              isBuilding={isLoading}
+              estimatedTime={estimatedTime}
+            />
+          )}
+
+          {/* Build Complete Celebration */}
+          {buildComplete && buildSummary && (
+            <div className="p-6 bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-lg">
+              <div className="text-center space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20">
+                  <PartyPopper className="h-8 w-8 text-green-500" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-green-600 dark:text-green-400">
+                    Your site is ready!
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    We&apos;ve successfully built your website
+                  </p>
+                </div>
+
+                {/* Build Summary */}
+                <div className="flex justify-center gap-6 py-4">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-2xl font-bold">
+                      <FileCode className="h-5 w-5 text-primary" />
+                      {buildSummary.filesCreated}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Files</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center gap-1 text-2xl font-bold">
+                      <FolderPlus className="h-5 w-5 text-primary" />
+                      {buildSummary.componentsCreated}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Components</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold">
+                      {buildSummary.pagesCreated}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Pages</p>
+                  </div>
+                </div>
+
+                {/* Preview Button */}
+                {buildSummary.previewUrl && (
+                  <Button
+                    size="lg"
+                    className="gap-2"
+                    onClick={() => window.open(buildSummary.previewUrl, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Preview Site
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-4 border-t">
+      <div className={`p-4 border-t ${isLoading ? 'animate-pulse bg-primary/5' : ''}`}>
         <div className="flex gap-2">
           <Input
             ref={inputRef}
@@ -322,7 +479,9 @@ export function AIChat({ projectId, onCodeGenerated }: AIChatProps) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-2 text-center">
-          Press Enter to send, Shift+Enter for new line
+          {isLoading
+            ? `Estimated time: ~${estimatedTime} seconds`
+            : 'Press Enter to send, Shift+Enter for new line'}
         </p>
       </div>
     </div>

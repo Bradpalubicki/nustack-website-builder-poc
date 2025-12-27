@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { TemplateSelector, Template } from './TemplateSelector';
+import { ImportExistingWizard } from './ImportExistingWizard';
 import {
   ArrowLeft,
   ArrowRight,
@@ -20,6 +21,10 @@ import {
   Building2,
   Globe,
   Palette,
+  Sparkles,
+  Upload,
+  FileCode,
+  Rocket,
 } from 'lucide-react';
 
 interface NewProjectWizardProps {
@@ -27,7 +32,7 @@ interface NewProjectWizardProps {
   onCancel: () => void;
 }
 
-type WizardStep = 'template' | 'details' | 'customize' | 'creating';
+type WizardStep = 'start' | 'template' | 'details' | 'customize' | 'creating';
 
 interface ProjectData {
   template: Template | null;
@@ -40,13 +45,15 @@ interface ProjectData {
 }
 
 const STEPS: { id: WizardStep; title: string; description: string }[] = [
+  { id: 'start', title: 'Get Started', description: 'Choose your path' },
   { id: 'template', title: 'Choose Template', description: 'Select a starting point' },
   { id: 'details', title: 'Project Details', description: 'Basic information' },
   { id: 'customize', title: 'Customize', description: 'Brand & settings' },
 ];
 
 export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps) {
-  const [currentStep, setCurrentStep] = useState<WizardStep>('template');
+  const [currentStep, setCurrentStep] = useState<WizardStep>('start');
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,7 +77,19 @@ export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps
     }));
   };
 
+  const handleStartFresh = () => {
+    setCurrentStep('template');
+  };
+
+  const handleImportExisting = () => {
+    setShowImportWizard(true);
+  };
+
   const handleNext = () => {
+    if (currentStep === 'start') {
+      // This shouldn't happen as we use specific buttons
+      return;
+    }
     if (currentStep === 'template' && !projectData.template) {
       return;
     }
@@ -127,6 +146,8 @@ export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps
 
   const canProceed = () => {
     switch (currentStep) {
+      case 'start':
+        return false; // Use specific action buttons
       case 'template':
         return !!projectData.template;
       case 'details':
@@ -138,6 +159,17 @@ export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps
     }
   };
 
+  // Show import wizard if selected
+  if (showImportWizard) {
+    return (
+      <ImportExistingWizard
+        onComplete={onComplete}
+        onBack={() => setShowImportWizard(false)}
+        onCancel={onCancel}
+      />
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
       {/* Header */}
@@ -148,53 +180,143 @@ export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps
         </p>
       </div>
 
-      {/* Progress Steps */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          {STEPS.map((step, index) => (
-            <div key={step.id} className="flex items-center">
-              <div
-                className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
-                  index < currentStepIndex
-                    ? 'bg-primary border-primary text-primary-foreground'
-                    : index === currentStepIndex
-                      ? 'border-primary text-primary'
-                      : 'border-muted text-muted-foreground'
-                }`}
-              >
-                {index < currentStepIndex ? (
-                  <Check className="h-5 w-5" />
-                ) : (
-                  <span>{index + 1}</span>
-                )}
-              </div>
-              <div className="ml-3 hidden sm:block">
-                <p
-                  className={`text-sm font-medium ${
-                    index <= currentStepIndex
-                      ? 'text-foreground'
-                      : 'text-muted-foreground'
+      {/* Progress Steps - Only show after start step */}
+      {currentStep !== 'start' && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            {STEPS.filter((s) => s.id !== 'start').map((step, index) => (
+              <div key={step.id} className="flex items-center">
+                <div
+                  className={`flex items-center justify-center w-10 h-10 rounded-full border-2 ${
+                    index < currentStepIndex - 1
+                      ? 'bg-primary border-primary text-primary-foreground'
+                      : index === currentStepIndex - 1
+                        ? 'border-primary text-primary'
+                        : 'border-muted text-muted-foreground'
                   }`}
                 >
-                  {step.title}
-                </p>
-                <p className="text-xs text-muted-foreground">{step.description}</p>
+                  {index < currentStepIndex - 1 ? (
+                    <Check className="h-5 w-5" />
+                  ) : (
+                    <span>{index + 1}</span>
+                  )}
+                </div>
+                <div className="ml-3 hidden sm:block">
+                  <p
+                    className={`text-sm font-medium ${
+                      index <= currentStepIndex - 1
+                        ? 'text-foreground'
+                        : 'text-muted-foreground'
+                    }`}
+                  >
+                    {step.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{step.description}</p>
+                </div>
+                {index < STEPS.length - 2 && (
+                  <div
+                    className={`w-12 sm:w-24 h-0.5 mx-4 ${
+                      index < currentStepIndex - 1 ? 'bg-primary' : 'bg-muted'
+                    }`}
+                  />
+                )}
               </div>
-              {index < STEPS.length - 1 && (
-                <div
-                  className={`w-12 sm:w-24 h-0.5 mx-4 ${
-                    index < currentStepIndex ? 'bg-primary' : 'bg-muted'
-                  }`}
-                />
-              )}
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Step Content */}
       <Card>
         <CardContent className="pt-6">
+          {/* Start Step - Choose Path */}
+          {currentStep === 'start' && (
+            <div className="space-y-6">
+              <div className="text-center mb-8">
+                <h2 className="text-2xl font-bold">How would you like to start?</h2>
+                <p className="text-muted-foreground mt-2">
+                  Create a new site from scratch or import an existing one
+                </p>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Start Fresh Option */}
+                <button
+                  onClick={handleStartFresh}
+                  className="group relative p-8 rounded-xl border-2 border-muted hover:border-primary transition-all duration-200 text-left bg-gradient-to-br from-primary/5 to-transparent hover:from-primary/10"
+                >
+                  <div className="absolute top-4 right-4">
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center">
+                      <Rocket className="h-7 w-7 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Start Fresh</h3>
+                      <p className="text-muted-foreground mt-2">
+                        Choose from our professionally designed templates and customize with AI assistance
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                        AI-Powered
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                        Templates
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">
+                        SEO Ready
+                      </span>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="h-5 w-5 text-primary" />
+                  </div>
+                </button>
+
+                {/* Import Existing Option */}
+                <button
+                  onClick={handleImportExisting}
+                  className="group relative p-8 rounded-xl border-2 border-muted hover:border-primary transition-all duration-200 text-left bg-gradient-to-br from-amber-500/5 to-transparent hover:from-amber-500/10"
+                >
+                  <div className="absolute top-4 right-4">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors">
+                      <FileCode className="h-5 w-5 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center">
+                      <Upload className="h-7 w-7 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold">Import Existing Site</h3>
+                      <p className="text-muted-foreground mt-2">
+                        Connect a GitHub repo, enter a website URL, or upload your code to get started
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        GitHub
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        URL Import
+                      </span>
+                      <span className="text-xs px-2 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                        Code Upload
+                      </span>
+                    </div>
+                  </div>
+                  <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <ArrowRight className="h-5 w-5 text-amber-500" />
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Template Selection */}
           {currentStep === 'template' && (
             <div>
@@ -356,32 +478,42 @@ export function NewProjectWizard({ onComplete, onCancel }: NewProjectWizardProps
       <div className="flex justify-between mt-6">
         <Button
           variant="outline"
-          onClick={currentStepIndex === 0 ? onCancel : handleBack}
+          onClick={
+            currentStep === 'start'
+              ? onCancel
+              : currentStep === 'template'
+                ? () => setCurrentStep('start')
+                : handleBack
+          }
           disabled={isCreating}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          {currentStepIndex === 0 ? 'Cancel' : 'Back'}
+          {currentStep === 'start' ? 'Cancel' : currentStep === 'template' ? 'Back to Start' : 'Back'}
         </Button>
 
-        {currentStepIndex < STEPS.length - 1 ? (
-          <Button onClick={handleNext} disabled={!canProceed()}>
-            Next
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        ) : (
-          <Button onClick={handleCreate} disabled={isCreating || !canProceed()}>
-            {isCreating ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
-              </>
+        {currentStep !== 'start' && (
+          <>
+            {currentStepIndex < STEPS.length - 1 ? (
+              <Button onClick={handleNext} disabled={!canProceed()}>
+                Next
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
             ) : (
-              <>
-                Create Project
-                <Check className="h-4 w-4 ml-2" />
-              </>
+              <Button onClick={handleCreate} disabled={isCreating || !canProceed()}>
+                {isCreating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    Create Project
+                    <Check className="h-4 w-4 ml-2" />
+                  </>
+                )}
+              </Button>
             )}
-          </Button>
+          </>
         )}
       </div>
     </div>
