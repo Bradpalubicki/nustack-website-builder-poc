@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import confetti from 'canvas-confetti';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,10 @@ import {
   ExternalLink,
   FileCode,
   FolderPlus,
+  Code2,
+  Eye,
 } from 'lucide-react';
+import { buildInitialMessage, type ProjectContext } from '@/lib/ai/system-prompt';
 
 interface Message {
   id: string;
@@ -50,18 +53,35 @@ interface SiteAnalysis {
 
 interface AIChatProps {
   projectId: string;
+  projectContext?: Partial<ProjectContext>;
   onCodeGenerated?: (code: string, language: string) => void;
   onPreviewReady?: (url: string) => void;
   onBuildStateChange?: (state: { isBuilding: boolean; progress: number; currentStep: string }) => void;
 }
 
-export function AIChat({ projectId, onCodeGenerated, onPreviewReady, onBuildStateChange }: AIChatProps) {
+export function AIChat({ projectId, projectContext, onCodeGenerated, onPreviewReady, onBuildStateChange }: AIChatProps) {
+  // Generate smart initial message based on project context
+  const initialMessage = useMemo(() => {
+    if (projectContext?.businessName && projectContext?.industry) {
+      return buildInitialMessage({
+        projectName: projectContext.projectName || projectContext.businessName,
+        businessName: projectContext.businessName,
+        industry: projectContext.industry,
+        location: projectContext.location,
+        services: projectContext.services,
+        features: projectContext.features,
+        existingWebsiteUrl: projectContext.existingWebsiteUrl,
+        analysisData: projectContext.analysisData,
+      });
+    }
+    return "Hi! I'm your AI assistant. I can help you build your website. Try:\n\n- Paste a URL like \"doctorsofhair.com\" and I'll analyze it\n- Ask me to create a hero section\n- Request a contact form or navigation menu\n\nWhat would you like to build?";
+  }, [projectContext]);
+
   const [messages, setMessages] = useState<Message[]>([
     {
       id: 'welcome',
       role: 'assistant',
-      content:
-        "Hi! I'm your AI assistant. I can help you build your website. Try:\n\n- Paste a URL like \"doctorsofhair.com\" and I'll analyze it\n- Ask me to create a hero section\n- Request a contact form or navigation menu\n\nWhat would you like to build?",
+      content: initialMessage,
       timestamp: new Date(),
     },
   ]);
@@ -75,6 +95,7 @@ export function AIChat({ projectId, onCodeGenerated, onPreviewReady, onBuildStat
   const [buildProgress, setBuildProgress] = useState(0);
   const [siteAnalysis, setSiteAnalysis] = useState<SiteAnalysis | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [developerMode, setDeveloperMode] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -384,6 +405,7 @@ IMPORTANT: You have all the data you need from the analysis above. Generate code
     let lastIndex = 0;
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)```/g;
     let match;
+    let codeBlockCount = 0;
 
     while ((match = codeBlockRegex.exec(content)) !== null) {
       // Add text before code block
@@ -397,33 +419,59 @@ IMPORTANT: You have all the data you need from the analysis above. Generate code
 
       const language = match[1] || 'text';
       const code = match[2].trim();
+      codeBlockCount++;
 
-      // Add code block
-      parts.push(
-        <div
-          key={`code-${match.index}`}
-          className="my-3 rounded-lg overflow-hidden bg-slate-900 border border-slate-700"
-        >
-          <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
-            <span className="text-xs text-slate-400 font-mono">{language}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-slate-400 hover:text-white"
-              onClick={() => copyToClipboard(code, `${message.id}-${match!.index}`)}
-            >
-              {copiedId === `${message.id}-${match.index}` ? (
-                <Check className="h-3 w-3" />
-              ) : (
-                <Copy className="h-3 w-3" />
-              )}
-            </Button>
+      // In developer mode, show full code blocks
+      // In regular mode, show a friendly summary
+      if (developerMode) {
+        parts.push(
+          <div
+            key={`code-${match.index}`}
+            className="my-3 rounded-lg overflow-hidden bg-slate-900 border border-slate-700"
+          >
+            <div className="flex items-center justify-between px-4 py-2 bg-slate-800 border-b border-slate-700">
+              <span className="text-xs text-slate-400 font-mono">{language}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-slate-400 hover:text-white"
+                onClick={() => copyToClipboard(code, `${message.id}-${match!.index}`)}
+              >
+                {copiedId === `${message.id}-${match.index}` ? (
+                  <Check className="h-3 w-3" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+              </Button>
+            </div>
+            <pre className="p-4 overflow-x-auto text-sm max-h-[300px]">
+              <code className="text-slate-300">{code}</code>
+            </pre>
           </div>
-          <pre className="p-4 overflow-x-auto text-sm">
-            <code className="text-slate-300">{code}</code>
-          </pre>
-        </div>
-      );
+        );
+      } else {
+        // Friendly mode - show a summary card instead of code
+        parts.push(
+          <div
+            key={`code-${match.index}`}
+            className="my-3 p-4 rounded-xl bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                <Check className="h-5 w-5 text-green-500" />
+              </div>
+              <div>
+                <p className="font-medium text-green-600 dark:text-green-400">
+                  {language === 'html' ? 'Website section generated' : `${language.toUpperCase()} code generated`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {code.split('\n').length} lines of code ready for preview
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      }
 
       lastIndex = match.index + match[0].length;
     }
@@ -441,16 +489,38 @@ IMPORTANT: You have all the data you need from the analysis above. Generate code
   return (
     <div className="flex flex-col h-full bg-background border rounded-lg">
       {/* Header */}
-      <div className="flex items-center gap-2 p-4 border-b">
-        <div className="p-2 rounded-lg bg-primary/10">
-          <Sparkles className="h-5 w-5 text-primary" />
+      <div className="flex items-center justify-between p-4 border-b">
+        <div className="flex items-center gap-2">
+          <div className="p-2 rounded-lg bg-primary/10">
+            <Sparkles className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h3 className="font-semibold">AI Builder</h3>
+            <p className="text-xs text-muted-foreground">
+              Powered by Claude
+            </p>
+          </div>
         </div>
-        <div>
-          <h3 className="font-semibold">AI Builder</h3>
-          <p className="text-xs text-muted-foreground">
-            Powered by Claude
-          </p>
-        </div>
+
+        {/* Developer Mode Toggle */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setDeveloperMode(!developerMode)}
+          className={`gap-2 ${developerMode ? 'bg-purple-500/10 text-purple-500' : ''}`}
+        >
+          {developerMode ? (
+            <>
+              <Code2 className="h-4 w-4" />
+              <span className="text-xs">Dev Mode</span>
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4" />
+              <span className="text-xs">Preview</span>
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Messages */}

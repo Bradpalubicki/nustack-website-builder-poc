@@ -8,7 +8,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { streamMessage, BUILDER_SYSTEM_PROMPT, HEALTHCARE_SYSTEM_PROMPT } from '@/lib/claude/client';
+import { streamMessage } from '@/lib/claude/client';
+import { buildSystemPrompt, type ProjectContext } from '@/lib/ai/system-prompt';
+import { detectIndustry } from '@/lib/ai/knowledge-base';
 
 export async function POST(
   request: NextRequest,
@@ -42,7 +44,7 @@ export async function POST(
 
     // Parse request body
     const body = await request.json();
-    const { message, history = [] } = body;
+    const { message, history = [], siteAnalysis } = body;
 
     if (!message) {
       return NextResponse.json(
@@ -51,22 +53,44 @@ export async function POST(
       );
     }
 
-    // Determine system prompt based on project industry
-    const industry = project.settings?.industry;
-    let systemPrompt = BUILDER_SYSTEM_PROMPT;
+    // Build comprehensive project context
+    const settings = project.settings || {};
 
-    if (industry === 'healthcare') {
-      systemPrompt = HEALTHCARE_SYSTEM_PROMPT;
-    }
+    // Auto-detect industry if not set
+    const detectedIndustry = settings.industry || detectIndustry({
+      businessName: settings.businessName,
+      description: siteAnalysis?.description,
+      title: siteAnalysis?.title,
+      services: settings.services,
+    });
 
-    // Add project context to system prompt
-    systemPrompt += `\n\nProject Context:
-- Project Name: ${project.name}
-- Industry: ${industry || 'General'}
-- Business Name: ${project.settings?.businessName || 'Not specified'}
-- Primary Color: ${project.settings?.primaryColor || '#3B82F6'}
+    // Build project context for smart prompts
+    const projectContext: ProjectContext = {
+      projectName: project.name,
+      businessName: settings.businessName,
+      industry: detectedIndustry,
+      location: settings.location,
+      phone: settings.phone,
+      email: settings.email,
+      services: settings.services,
+      features: settings.features,
+      existingWebsiteUrl: settings.existingUrl || siteAnalysis?.url,
+      analysisData: siteAnalysis ? {
+        title: siteAnalysis.title,
+        description: siteAnalysis.description,
+        hasBooking: siteAnalysis.contentSections?.some((s: { type: string }) =>
+          s.type.toLowerCase().includes('book') || s.type.toLowerCase().includes('appointment')
+        ),
+        hasForms: siteAnalysis.contentSections?.some((s: { type: string }) =>
+          s.type.toLowerCase().includes('form') || s.type.toLowerCase().includes('contact')
+        ),
+        socialLinks: siteAnalysis.socialLinks?.map((s: { platform: string }) => s.platform),
+      } : undefined,
+      customInstructions: settings.customInstructions,
+    };
 
-Generate code and content appropriate for this project.`;
+    // Build comprehensive system prompt
+    const systemPrompt = buildSystemPrompt(projectContext);
 
     // Build message history
     const messages = [
