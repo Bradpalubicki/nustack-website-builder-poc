@@ -17,6 +17,7 @@ type DeviceType = 'desktop' | 'tablet' | 'mobile';
 
 interface PreviewPanelProps {
   previewUrl?: string | null;
+  html?: string; // Support inline HTML via srcDoc
   isLoading?: boolean;
 }
 
@@ -26,17 +27,25 @@ const DEVICE_CONFIGS: Record<DeviceType, { width: string; height: string; label:
   mobile: { width: '375px', height: '667px', label: 'Mobile' },
 };
 
-export function PreviewPanel({ previewUrl, isLoading = false }: PreviewPanelProps) {
+export function PreviewPanel({ previewUrl, html, isLoading = false }: PreviewPanelProps) {
   const [device, setDevice] = useState<DeviceType>('desktop');
   const [iframeLoading, setIframeLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Reset iframe loading state when URL changes
+  // Determine if we have content to show
+  const hasContent = previewUrl || html;
+
+  // Reset iframe loading state when URL or HTML changes
   useEffect(() => {
-    if (previewUrl) {
+    if (previewUrl || html) {
       setIframeLoading(true);
+      // For srcDoc, loading is nearly instant
+      if (html && !previewUrl) {
+        const timer = setTimeout(() => setIframeLoading(false), 100);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [previewUrl, refreshKey]);
+  }, [previewUrl, html, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
@@ -46,6 +55,10 @@ export function PreviewPanel({ previewUrl, isLoading = false }: PreviewPanelProp
   const handleOpenInNewTab = () => {
     if (previewUrl) {
       window.open(previewUrl, '_blank');
+    } else if (html) {
+      // Open HTML content in new tab using data URL
+      const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+      window.open(dataUrl, '_blank');
     }
   };
 
@@ -70,8 +83,8 @@ export function PreviewPanel({ previewUrl, isLoading = false }: PreviewPanelProp
     );
   }
 
-  // No preview URL yet
-  if (!previewUrl) {
+  // No preview content yet
+  if (!hasContent) {
     return (
       <div className="h-full flex flex-col bg-background border rounded-lg">
         <div className="flex items-center justify-between p-3 border-b">
@@ -198,8 +211,9 @@ export function PreviewPanel({ previewUrl, isLoading = false }: PreviewPanelProp
 
           {/* iframe */}
           <iframe
-            key={refreshKey}
-            src={previewUrl}
+            key={`${refreshKey}-${html?.length || 0}`}
+            src={previewUrl || undefined}
+            srcDoc={!previewUrl && html ? html : undefined}
             className={`w-full h-full border-0 transition-opacity duration-300 ${
               iframeLoading ? 'opacity-0' : 'opacity-100'
             }`}
