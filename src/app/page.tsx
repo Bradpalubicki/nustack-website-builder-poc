@@ -79,21 +79,22 @@ export default async function Home() {
             </Button>
           ) : (
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              {/* Primary CTA - Gradient */}
               <Button
                 size="lg"
                 asChild
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg font-semibold shadow-lg shadow-blue-600/25"
+                className="bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-600 hover:to-purple-700 text-white px-8 py-6 text-lg font-semibold shadow-lg shadow-brand-500/25 border-0"
               >
                 <Link href="/register">
                   Start Building Free
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </Button>
+              {/* Secondary CTA - MAXIMUM VISIBILITY WHITE */}
               <Button
                 size="lg"
-                variant="outline"
                 asChild
-                className="border-2 border-white text-white bg-transparent hover:bg-white hover:text-slate-900 px-8 py-6 text-lg font-semibold"
+                className="bg-white/10 hover:bg-white/20 text-white border-2 border-white px-8 py-6 text-lg font-semibold backdrop-blur-sm"
               >
                 <Link href="/login">Log In</Link>
               </Button>

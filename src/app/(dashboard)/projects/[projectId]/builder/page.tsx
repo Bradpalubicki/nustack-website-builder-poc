@@ -182,25 +182,25 @@ ${code}
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-dark-900">
       {/* Main Content Area */}
       <div className={`flex flex-col min-w-0 transition-all duration-300 ${
         layoutMode === "chat-only" ? "w-0 opacity-0" : "flex-1"
       }`}>
-        {/* Top Toolbar */}
-        <div className="h-14 border-b flex items-center justify-between px-4 bg-background shrink-0">
+        {/* Top Toolbar - Glass effect */}
+        <div className="h-16 border-b border-slate-200 dark:border-white/10 flex items-center justify-between px-6 bg-white/80 dark:bg-dark-800/80 backdrop-blur-xl shrink-0">
           <div className="flex items-center gap-4">
             <Link href="/projects">
-              <Button variant="ghost" size="icon">
-                <ArrowLeft className="h-4 w-4" />
+              <Button variant="ghost" size="icon" className="rounded-full hover:bg-slate-100 dark:hover:bg-white/10">
+                <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
-            <Separator orientation="vertical" className="h-6" />
+            <Separator orientation="vertical" className="h-6 dark:bg-white/10" />
             <div>
-              <h2 className="font-semibold">Project Builder</h2>
-              <p className="text-xs text-muted-foreground">Project ID: {projectId}</p>
+              <h2 className="font-semibold text-lg">Project Builder</h2>
+              <p className="text-xs text-muted-foreground font-mono">ID: {projectId.slice(0, 8)}...</p>
             </div>
-            <Badge variant="secondary" className="gap-1">
+            <Badge className="gap-1 bg-gradient-to-r from-brand-500 to-purple-600 text-white border-0">
               <Sparkles className="h-3 w-3" />
               AI Powered
             </Badge>
@@ -214,6 +214,7 @@ ${code}
               disabled={historyIndex === 0}
               onClick={handleUndo}
               title="Undo"
+              className="rounded-full"
             >
               <Undo className="h-4 w-4" />
             </Button>
@@ -223,36 +224,37 @@ ${code}
               disabled={historyIndex >= codeHistory.length - 1}
               onClick={handleRedo}
               title="Redo"
+              className="rounded-full"
             >
               <Redo className="h-4 w-4" />
             </Button>
 
-            <Separator orientation="vertical" className="h-6 mx-2" />
+            <Separator orientation="vertical" className="h-6 mx-2 dark:bg-white/10" />
 
-            {/* Viewport Controls */}
-            <div className="flex items-center border rounded-md">
+            {/* Viewport Controls - Premium style */}
+            <div className="flex items-center bg-slate-100 dark:bg-dark-700 rounded-full p-1">
               <Button
-                variant={viewportSize === "desktop" ? "secondary" : "ghost"}
+                variant="ghost"
                 size="icon"
-                className="rounded-r-none"
+                className={`rounded-full h-8 w-8 ${viewportSize === "desktop" ? "bg-white dark:bg-dark-500 shadow-sm" : ""}`}
                 onClick={() => setViewportSize("desktop")}
                 title="Desktop view"
               >
                 <Monitor className="h-4 w-4" />
               </Button>
               <Button
-                variant={viewportSize === "tablet" ? "secondary" : "ghost"}
+                variant="ghost"
                 size="icon"
-                className="rounded-none border-x"
+                className={`rounded-full h-8 w-8 ${viewportSize === "tablet" ? "bg-white dark:bg-dark-500 shadow-sm" : ""}`}
                 onClick={() => setViewportSize("tablet")}
                 title="Tablet view"
               >
                 <Tablet className="h-4 w-4" />
               </Button>
               <Button
-                variant={viewportSize === "mobile" ? "secondary" : "ghost"}
+                variant="ghost"
                 size="icon"
-                className="rounded-l-none"
+                className={`rounded-full h-8 w-8 ${viewportSize === "mobile" ? "bg-white dark:bg-dark-500 shadow-sm" : ""}`}
                 onClick={() => setViewportSize("mobile")}
                 title="Mobile view"
               >
@@ -260,7 +262,7 @@ ${code}
               </Button>
             </div>
 
-            <Separator orientation="vertical" className="h-6 mx-2" />
+            <Separator orientation="vertical" className="h-6 mx-2 dark:bg-white/10" />
 
             {/* Actions */}
             <Button
@@ -268,7 +270,7 @@ ${code}
               size="sm"
               onClick={handleSave}
               disabled={isSaving}
-              className="gap-2"
+              className="gap-2 rounded-full"
             >
               {saveStatus === "saving" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -282,12 +284,13 @@ ${code}
             <Button
               variant="outline"
               size="sm"
+              className="rounded-full"
               onClick={() => window.open(`data:text/html;charset=utf-8,${encodeURIComponent(generatedCode)}`, '_blank')}
             >
               <ExternalLink className="h-4 w-4 mr-2" />
               Preview
             </Button>
-            <Button size="sm">
+            <Button size="sm" className="rounded-full bg-gradient-to-r from-brand-500 to-purple-600 hover:from-brand-600 hover:to-purple-700 border-0">
               <Play className="h-4 w-4 mr-2" />
               Deploy
             </Button>
@@ -334,22 +337,38 @@ ${code}
               </Button>
             </div>
 
-            <TabsContent value="preview" className="flex-1 m-0 p-4 bg-muted/30 overflow-auto">
+            <TabsContent value="preview" className="flex-1 m-0 p-6 bg-slate-100 dark:bg-dark-900 overflow-auto">
               <div
-                className="mx-auto bg-white rounded-lg shadow-lg overflow-hidden transition-all duration-300"
+                className="mx-auto rounded-2xl bg-white dark:bg-dark-800 shadow-2xl overflow-hidden border border-slate-200 dark:border-white/10 transition-all duration-300"
                 style={{
                   width: getViewportWidth(),
                   height: "100%",
-                  maxHeight: "calc(100vh - 180px)",
+                  maxHeight: "calc(100vh - 200px)",
                 }}
               >
-                <iframe
-                  srcDoc={generatedCode}
-                  className="w-full h-full border-0"
-                  title="Website Preview"
-                  sandbox="allow-scripts allow-same-origin"
-                  key={generatedCode.length} // Force re-render on code change
-                />
+                {/* Browser Chrome */}
+                <div className="h-10 bg-slate-100 dark:bg-dark-700 flex items-center gap-2 px-4 border-b border-slate-200 dark:border-white/5">
+                  <div className="flex gap-1.5">
+                    <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                  </div>
+                  <div className="flex-1 mx-4">
+                    <div className="bg-white dark:bg-dark-600 rounded-full px-4 py-1 text-xs text-muted-foreground text-center">
+                      {previewUrl || 'preview.nustack.app'}
+                    </div>
+                  </div>
+                </div>
+                {/* Preview Content */}
+                <div className="h-[calc(100%-2.5rem)] overflow-auto">
+                  <iframe
+                    srcDoc={generatedCode}
+                    className="w-full h-full border-0"
+                    title="Website Preview"
+                    sandbox="allow-scripts allow-same-origin"
+                    key={generatedCode.length}
+                  />
+                </div>
               </div>
             </TabsContent>
 
@@ -425,16 +444,47 @@ ${code}
         </Button>
       )}
 
-      {/* Full-Screen Build Progress Overlay */}
+      {/* Full-Screen Build Progress Overlay - Premium */}
       {buildState.isBuilding && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-8 max-w-lg w-full mx-4 shadow-2xl">
-            <BuildProgress
-              isBuilding={buildState.isBuilding}
-              currentStep={buildState.currentStep}
-              progress={buildState.progress}
-              estimatedTime={30}
-            />
+        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex items-center justify-center">
+          <div className="max-w-md w-full mx-4">
+            {/* Animated Logo */}
+            <div className="flex justify-center mb-8">
+              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-brand-500 to-purple-600 flex items-center justify-center animate-pulse shadow-lg shadow-brand-500/25">
+                <Sparkles className="h-10 w-10 text-white" />
+              </div>
+            </div>
+
+            {/* Progress Card */}
+            <div className="bg-white dark:bg-dark-800 rounded-2xl p-8 shadow-2xl border border-slate-200 dark:border-white/10">
+              <h2 className="text-2xl font-bold text-center mb-2">Building Your Site</h2>
+              <p className="text-center text-muted-foreground mb-6">This usually takes 30-60 seconds</p>
+
+              {/* Animated Progress Bar */}
+              <div className="relative h-3 bg-slate-200 dark:bg-dark-600 rounded-full overflow-hidden mb-6">
+                <div
+                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-brand-500 to-purple-600 rounded-full transition-all duration-500"
+                  style={{ width: `${buildState.progress}%` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+              </div>
+
+              {/* Current Step */}
+              <div className="flex items-center justify-center gap-3 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-xl">
+                <Loader2 className="h-5 w-5 text-brand-600 dark:text-brand-400 animate-spin" />
+                <span className="font-medium text-brand-700 dark:text-brand-300">{buildState.currentStep || 'Initializing...'}</span>
+              </div>
+
+              {/* Progress percentage */}
+              <p className="text-center text-sm text-muted-foreground mt-4">
+                {Math.round(buildState.progress)}% complete
+              </p>
+            </div>
+
+            {/* Tip */}
+            <div className="mt-6 text-center">
+              <p className="text-white/60 text-sm">💡 Your site will be SEO-optimized out of the box</p>
+            </div>
           </div>
         </div>
       )}
